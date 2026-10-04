@@ -2,7 +2,7 @@ name: Adonis
 #### ********************************************** ####
 #### REMEMBER to bump versions also in Dockerfile!  ####
 #### ********************************************** ####
-version: 5.0.0
+version: 5.0.1
 
 slug: adonis
 description: A Probonis add-on is naturally called an Adonis!

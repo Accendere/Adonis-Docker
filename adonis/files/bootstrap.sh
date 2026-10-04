@@ -227,4 +227,8 @@ export ADONIS_BOOTSTRAP_MODE="$mode"
 export ADONIS_APP_COMMIT="$commit"
 export persist_home webrootdocker
 echo ">>> handing over to $addon_dir/run.sh (mode=$mode, app ${commit:0:12}, t=${SECONDS}s)"
-exec /usr/bin/with-contenv bashio "$addon_dir/run.sh"
+# Plain bashio, NOT with-contenv: with-contenv empties the environment and
+# reloads only the container's own variables, which would drop every export
+# above (seen on alameda's first boot: run.sh got bootstrap API 'none').
+# This script already runs under with-contenv, so those variables are here.
+exec bashio "$addon_dir/run.sh"
