@@ -1,0 +1,6 @@
+# The huge PhpStorm IDE directory is files/root/.cache
+
+# Uncomment this line to ignore it in Production environments
+# Comment this line to install it in Debug environments
+
+files/root/.cache

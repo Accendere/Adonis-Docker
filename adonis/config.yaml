@@ -1,0 +1,129 @@
+name: Adonis
+#### ********************************************** ####
+#### REMEMBER to bump versions also in Dockerfile!  ####
+#### ********************************************** ####
+version: 5.0.0
+
+slug: adonis
+description: A Probonis add-on is naturally called an Adonis!
+url: https://github.com/Accendere/Adonis-Docker
+arch:
+  - aarch64
+  - amd64
+#image: ghcr.io/faserf/apache2-{arch}
+# webui: http://[HOST]:[PORT:80]
+# IMPORTANT - two bugs found here in one day (2026-09-17), read before touching:
+#
+# 1) ed92ec3 (2026-08-30) swapped the deprecated `config:rw` for
+#    `homeassistant_config:rw` while chasing a Supervisor deprecation
+#    warning. Bare `homeassistant_config:rw` mounts Home Assistant's real
+#    config at /homeassistant, NOT /config - this silently turned /config
+#    into a non-persistent path baked into the container's own ephemeral
+#    overlay. It survived by accident as long as the container was never
+#    recreated; the next real rebuild wiped /config/_adonis_local
+#    (the live SQLite DB, git-backed local config, secrets).
+#
+# 2) The first fix for that (067ea14) used `addon_config:rw` instead, which
+#    IS genuinely persistent but mounts a private per-addon folder
+#    (/addon_configs/{repo}_adonis/ on the host) that nothing else - not
+#    VS Code Server, not File Editor, not Samba, not the `<host>-hass-adonis`
+#    git backup branch's usual working copy - can see. `_adonis_local` has
+#    always lived INSIDE Home Assistant's real, shared /config (confirmed by
+#    finding it there via the VS Code Server addon), not in an addon-private
+#    folder. This is what every OTHER addon that wants to see "/config" as
+#    HA's real config actually does (e.g. hassio-addons/vscode's own
+#    config.yaml) - it takes the object form of `homeassistant_config` with
+#    an explicit `path: /config` override, since the bare-string form
+#    defaults to /homeassistant instead.
+#
+# The `- type: ... path: /config` form below is the correct, verified fix.
+# Do NOT change this back to `addon_config:rw` or bare `homeassistant_config:rw`
+# without re-reading this whole comment.
+map:
+  - type: ssl
+    read_only: false
+  - type: media
+    read_only: false
+  - type: share
+    read_only: false
+  - type: homeassistant_config
+    read_only: false
+    path: /config
+# persist_home lives in /data, this add-on's own private storage — excluded here so dev-tooling caches (VS
+# Code Server, Claude Code CLI, etc.) never ride along in a backup. None of
+# it is meant to survive a restore anyway: every per-host secret under it
+# (WireGuard/deploy/docker-hop keys, SSH host key) is designed to be
+# regenerated and re-authorized on loss, not restored from a backup file.
+backup_exclude:
+  - persist_home/**
+  # addon/ scripts extracted by bootstrap.sh (current + last-good), just a
+  # cache of what's in the app repo
+  - bootstrap/**
+ingress: true
+ingress_port: 8099
+init: false
+panel_icon: mdi:web-box
+# Needed for WireGuard to function at all.
+privileged:
+  - NET_ADMIN
+devices:
+  - /dev/net/tun
+options:
+  debug: false
+  php_ini: default
+  default_conf: default
+  default_ssl_conf: default
+  website_name: Adonis
+  ssl: true
+  certfile: fullchain.pem
+  keyfile: privkey.pem
+  init_commands: []
+  github_tag: ""
+  app_repo: ""
+  rollback_after_failed_starts: 3
+  base_config_dir: "/config/_adonis_local"
+  json_queue_pattern: "*_adonis.json"
+  claude_code: false
+schema:
+  debug: bool
+  php_ini: str
+  default_conf: str
+  default_ssl_conf: str
+  website_name: str
+  username: str?
+  password: password?
+  ssl: bool
+  certfile: str
+  keyfile: str
+  init_commands:
+    - str?
+  zabbix_server: str?
+  github_tag: str
+  # SSH URL of the private app repo; its addon/ directory holds every boot
+  # script past the bootstrap
+  app_repo: str
+  # After this many starts in a row where the tag's scripts never reached
+  # supervisord, boot the last-good scripts and app commit instead. 0 = never.
+  rollback_after_failed_starts: int(0,)?
+  base_config_dir: str
+  json_queue_pattern: str
+  docker_hop_host: str?
+  docker_hop_user: str?
+  claude_code: bool
+  # Opt-in root password for SSH. Unset = key-only login. Plain text or a
+  # crypt(3) hash starting with "$".
+  ssh_root_password: password?
+# Host ports are left unset here on purpose: each host sets them in the
+# add-on's Network config, so they're not published with this repo. Nothing
+# is exposed on the host until it does. The HTTP->HTTPS redirect follows
+# whatever 443/tcp is mapped to.
+ports:
+  80/tcp: null
+  443/tcp: null
+  22/tcp: null
+  51820/udp: null
+ports_description:
+  80/tcp: Web interface http
+  443/tcp: SSL Web interface
+  22/tcp: SSH Server
+  51820/udp: WireGuard VPN (opt-in, no-op until configured)
