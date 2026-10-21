@@ -12,7 +12,7 @@ ENV BUILD_VERSION=${BUILD_VERSION}
 #### ********************************************** ####
 #### REMEMBER to bump versions also in config.yaml! ####
 #### ********************************************** ####
-LABEL io.hass.version="5.0.2" \
+LABEL io.hass.version="5.0.3" \
       io.hass.type="addon" \
       io.hass.arch="aarch64|amd64"
 
@@ -52,11 +52,14 @@ RUN apt-get update && \
 # Configure PHP Timezone
 RUN find /etc/php/8.4/ -name "php.ini" -exec sed -i 's/;date.timezone =/date.timezone = "Europe\/Lisbon"/g' {} \;
 
-# Install Zabbix Agent 2 and Zabbix Sender
+# Install Zabbix Agent 2 and Zabbix Sender. Plugins go in a second apt run: since 7.4.16 their
+# postinst does `chown root:zabbix` and fails when dpkg configures them before zabbix-agent2
+# has created the group (build error "chown: invalid group"), so the agent must be set up first.
 RUN wget https://repo.zabbix.com/zabbix/7.4/release/debian/pool/main/z/zabbix-release/zabbix-release_latest_7.4+debian12_all.deb && \
     dpkg -i zabbix-release_latest_7.4+debian12_all.deb && \
     apt-get update && \
-    apt-get install -y zabbix-agent2 zabbix-agent2-plugin-* zabbix-sender && \
+    apt-get install -y zabbix-agent2 zabbix-sender && \
+    apt-get install -y zabbix-agent2-plugin-* && \
     rm -rf /var/lib/apt/lists/* zabbix-release_latest_7.4+debian12_all.deb && \
     ln -s /usr/bin/zabbix_sender /etc/zabbix/zabbix_sender
 
