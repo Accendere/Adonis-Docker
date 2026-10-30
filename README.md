@@ -2,7 +2,7 @@
 
 Home Assistant Supervisor add-on repository for Adonis.
 
-This repository is intentionally thin: it contains the container image
+This **Public** repository is intentionally thin: it contains the container image
 (packages only) and a small `bootstrap.sh`. On every start the bootstrap
 fetches a private application repository at the tag set in the add-on's
 `github_tag` option, using a read-only deploy key generated on first boot,
