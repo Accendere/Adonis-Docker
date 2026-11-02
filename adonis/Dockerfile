@@ -12,7 +12,7 @@ ENV BUILD_VERSION=${BUILD_VERSION}
 #### ********************************************** ####
 #### REMEMBER to bump versions also in config.yaml! ####
 #### ********************************************** ####
-LABEL io.hass.version="5.0.3" \
+LABEL io.hass.version="5.0.4" \
       io.hass.type="addon" \
       io.hass.arch="aarch64|amd64"
 
