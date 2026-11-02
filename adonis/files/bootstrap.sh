@@ -4,8 +4,11 @@
 # Adonis bootstrap: the only boot logic baked into this (public) image.
 #
 # Everything site-specific (sshd policy, admin keys, WireGuard, Apache,
-# Zabbix, docs...) lives in the private app repo under addon/, versioned by
-# the same per-host git tag as the app itself. This script only:
+# Zabbix, docs...) lives in the private app repo under docker/ (addon/ on
+# older commits), versioned by the same per-host git tag as the app itself.
+# Below, "addon" means that directory, whatever it is called at that commit,
+# and it stays the name of everything this side of the extraction. This
+# script only:
 #   1. migrates the pre-4.1.18 persist_home location (must run before
 #      anything creates /data/persist_home, or the migration never fires)
 #   2. makes sure this host has its own read-only deploy key for the app repo
@@ -116,16 +119,34 @@ if ! git fetch origin "+refs/tags/${GITHUB_TAG}:refs/tags/${GITHUB_TAG}" 2>&1 | 
 fi
 rm -f "$fetch_log"
 
+# Prints which directory holds the boot scripts at $1. Judged by its run.sh,
+# not the name alone, and addon/ stays on the list for as long as a tag, or a
+# last-good fallback, can point at a commit from before the rename.
+addon_source() {
+	local name
+	for name in docker addon; do
+		if git cat-file -e "$1:$name/run.sh" 2>/dev/null; then
+			printf '%s\n' "$name"
+			return 0
+		fi
+	done
+	return 1
+}
+
 # Extracts addon/ at $1 into $bootstrap_dir/addon-$1 unless it's already
 # there. Refuses scripts that don't even parse, so a typo on a tag falls
 # back to last-good instead of killing the boot.
 extract_addon() {
-	local commit="$1" dest="$bootstrap_dir/addon-$1" staging="$bootstrap_dir/.staging" f
+	local commit="$1" dest="$bootstrap_dir/addon-$1" staging="$bootstrap_dir/.staging" f source
 	if [ -f "$dest/run.sh" ]; then return 0; fi
+	if ! source=$(addon_source "$commit"); then
+		echo ">>> WARNING: commit $commit has neither docker/run.sh nor addon/run.sh"
+		return 1
+	fi
 	rm -rf "$staging"
 	mkdir -p "$staging"
-	if ! git archive "$commit" addon | tar -x -C "$staging" --strip-components=1; then
-		echo ">>> WARNING: commit $commit has no addon/ directory"
+	if ! git archive "$commit" "$source" | tar -x -C "$staging" --strip-components=1; then
+		echo ">>> WARNING: could not extract $source/ at $commit"
 		rm -rf "$staging"
 		return 1
 	fi
@@ -136,11 +157,6 @@ extract_addon() {
 			return 1
 		fi
 	done < <(find "$staging" -name '*.sh')
-	if [ ! -f "$staging/run.sh" ]; then
-		echo ">>> WARNING: addon/run.sh missing at $commit"
-		rm -rf "$staging"
-		return 1
-	fi
 	printf '%s %s\n' "$GITHUB_TAG" "$commit" > "$staging/.adonis-source"
 	mv "$staging" "$dest"
 }
@@ -180,7 +196,7 @@ if [ -z "$addon_dir" ]; then
 	else
 		print_deploy_key_help
 		fatal "no usable addon/ for tag '$GITHUB_TAG' and no last-good copy cached yet." \
-			"Check that the tag exists, that it contains addon/run.sh, and the deploy key above."
+			"Check that the tag exists, that it contains docker/run.sh or addon/run.sh, and the deploy key above."
 	fi
 fi
 
